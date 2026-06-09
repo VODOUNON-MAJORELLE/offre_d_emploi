@@ -1,6 +1,8 @@
 <?php
 
-use App\Models\User;
+use App\Models\Candidat;
+use App\Models\Entreprise;
+use App\Models\Administrateur;
 
 return [
 
@@ -13,11 +15,13 @@ return [
     | reset "broker" for your application. You may change these values
     | as required, but they're a perfect start for most applications.
     |
+    | Supported: "candidat", "entreprise", "admin"
+    |
     */
 
     'defaults' => [
-        'guard' => env('AUTH_GUARD', 'web'),
-        'passwords' => env('AUTH_PASSWORD_BROKER', 'users'),
+        'guard' => env('AUTH_GUARD', 'candidat'),
+        'passwords' => env('AUTH_PASSWORD_BROKER', 'candidats'),
     ],
 
     /*
@@ -38,9 +42,17 @@ return [
     */
 
     'guards' => [
-        'web' => [
+        'candidat' => [
             'driver' => 'session',
-            'provider' => 'users',
+            'provider' => 'candidats',
+        ],
+        'entreprise' => [
+            'driver' => 'session',
+            'provider' => 'entreprises',
+        ],
+        'admin' => [
+            'driver' => 'session',
+            'provider' => 'administrateurs',
         ],
     ],
 
@@ -62,15 +74,18 @@ return [
     */
 
     'providers' => [
-        'users' => [
+        'candidats' => [
             'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', User::class),
+            'model' => Candidat::class,
         ],
-
-        // 'users' => [
-        //     'driver' => 'database',
-        //     'table' => 'users',
-        // ],
+        'entreprises' => [
+            'driver' => 'eloquent',
+            'model' => Entreprise::class,
+        ],
+        'administrateurs' => [
+            'driver' => 'eloquent',
+            'model' => Administrateur::class,
+        ],
     ],
 
     /*
@@ -93,10 +108,16 @@ return [
     */
 
     'passwords' => [
-        'users' => [
-            'provider' => 'users',
-            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
-            'expire' => 60,
+        'candidats' => [
+            'provider' => 'candidats',
+            'table' => 'password_reset_tokens',
+            'expire' => 30,
+            'throttle' => 60,
+        ],
+        'entreprises' => [
+            'provider' => 'entreprises',
+            'table' => 'password_reset_tokens',
+            'expire' => 30,
             'throttle' => 60,
         ],
     ],

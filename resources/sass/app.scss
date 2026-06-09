@@ -1,0 +1,201 @@
+// Fonts
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
+
+// Variable overrides for Bootstrap 5
+$primary: #4e44e7;
+$secondary: #7c3aed;
+$success: #10b981;
+$info: #3b82f6;
+$warning: #f59e0b;
+$danger: #ef4444;
+$body-bg: #f5f6fa;
+$body-color: #1e293b;
+$font-family-sans-serif: 'Instrument Sans', sans-serif;
+$border-radius: 12px;
+$border-radius-lg: 20px;
+$border-radius-sm: 8px;
+
+// Import Bootstrap
+@import "bootstrap/scss/bootstrap";
+
+// Custom styles for Talentlink (Premium Aesthetic)
+body {
+    background: radial-gradient(circle at 10% 20%, rgba(239, 246, 255, 0.5) 0%, rgba(245, 246, 250, 1) 90%);
+    min-height: 100vh;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+.bg-talentlink-gradient {
+    background: linear-gradient(135deg, #4e44e7 0%, #7c3aed 100%);
+}
+
+.text-gradient {
+    background: linear-gradient(135deg, #4e44e7 0%, #7c3aed 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+// Glassmorphism and Cards
+.premium-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: $border-radius-lg;
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04), 0 1px 1px 0 rgba(0, 0, 0, 0.02);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 20px 40px -15px rgba(78, 68, 231, 0.08), 0 1px 3px 0 rgba(0, 0, 0, 0.02);
+    }
+}
+
+.premium-btn {
+    border-radius: 50px;
+    padding: 0.6rem 1.8rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    
+    &.btn-primary {
+        background: linear-gradient(135deg, #4e44e7 0%, #7c3aed 100%);
+        border: none;
+        box-shadow: 0 4px 15px rgba(78, 68, 231, 0.2);
+        
+        &:hover {
+            opacity: 0.95;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(78, 68, 231, 0.3);
+        }
+    }
+    
+    &.btn-secondary {
+        background: #f8fafc;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        
+        &:hover {
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+    }
+}
+
+// Custom Navigation Bar
+.navbar-custom {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+    padding: 0.75rem 2rem;
+    
+    .nav-link {
+        font-weight: 500;
+        color: #475569;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+        
+        &:hover, &.active {
+            color: #4e44e7;
+            background: rgba(78, 68, 231, 0.06);
+        }
+    }
+}
+
+// Progress Tracker Components
+.progression-step {
+    position: relative;
+    padding-left: 2.5rem;
+    margin-bottom: 1.5rem;
+    
+    &::before {
+        content: '';
+        position: absolute;
+        left: 0.75rem;
+        top: 1.5rem;
+        bottom: -1.5rem;
+        width: 2px;
+        background: #e2e8f0;
+    }
+    
+    &:last-child::before {
+        display: none;
+    }
+    
+    .step-icon {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        font-weight: bold;
+        z-index: 1;
+        transition: all 0.3s ease;
+    }
+    
+    &.completed {
+        &::before {
+            background: #10b981;
+        }
+        .step-icon {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border: 2px solid #10b981;
+        }
+    }
+    
+    &.current {
+        .step-icon {
+            background: rgba(78, 68, 231, 0.1);
+            color: #4e44e7;
+            border: 2px solid #4e44e7;
+            box-shadow: 0 0 10px rgba(78, 68, 231, 0.2);
+        }
+    }
+    
+    &.pending {
+        .step-icon {
+            background: #f1f5f9;
+            color: #94a3b8;
+            border: 2px solid #cbd5e1;
+        }
+    }
+}
+
+// Avatar Styles
+.avatar-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #4e44e7;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+}
+
+// Score Badges
+.score-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 50px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    
+    &.high {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+    &.medium {
+        background: rgba(245, 158, 11, 0.1);
+        color: #f59e0b;
+    }
+    &.low {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+    }
+}
