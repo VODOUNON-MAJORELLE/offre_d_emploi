@@ -10,9 +10,14 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function (Middleware $middleware): void {
-        //
+    ->withMiddleware(function (Middleware $middleware) {
+        $middleware->alias([
+            'auth.entreprise' => \App\Http\Middleware\AuthEntreprise::class,
+            'guest.entreprise' => \App\Http\Middleware\GuestEntreprise::class,
+            'auth.admin' => \App\Http\Middleware\AuthAdmin::class,
+            'guest.admin' => \App\Http\Middleware\GuestAdmin::class,
+        ]);
     })
-    ->withExceptions(function (Exceptions $exceptions): void {
+    ->withExceptions(function (Exceptions $exceptions) {
         //
     })->create();
