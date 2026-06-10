@@ -193,6 +193,36 @@ Route::middleware(['auth:entreprise', 'check_status'])->group(function () {
         return view('entreprise.profil', compact('entreprise'));
     })->name('entreprises.show');
 
+    // Profil candidat public (accessible aux entreprises)
+    Route::get('/candidats/{id_candidat}', function ($id_candidat) {
+        $candidat = \App\Models\Candidat::findOrFail($id_candidat);
+        $cvs = $candidat->cvs()->where('statut', 'actif')->orderByDesc('date_upload')->get();
+        $principalCv = $candidat->principalCv;
+        $competences = array_filter(array_map('trim', explode(',', $candidat->competences ?? '')));
+
+        $steps = [
+            'photo'      => !empty($candidat->photo_profil),
+            'telephone'  => !empty($candidat->telephone),
+            'cv'         => !empty($principalCv),
+            'competences'=> count($competences) > 0,
+        ];
+
+        $completion = round(array_sum($steps) / count($steps) * 100);
+
+        $experiences = \App\Models\Experience::where('id_candidat', $candidat->id_candidat)
+            ->orderByDesc('annee_debut')
+            ->get();
+
+        $formations = \App\Models\Formation::where('id_candidat', $candidat->id_candidat)
+            ->orderByDesc('annee_debut')
+            ->get();
+
+        return view('candidat.profile', compact(
+            'candidat', 'cvs', 'principalCv', 'competences',
+            'steps', 'completion', 'experiences', 'formations'
+        ));
+    })->name('candidats.show');
+
     // Créer une offre
     Route::get('/entreprise/offres/create', function () {
         $entreprise = \Illuminate\Support\Facades\Auth::guard('entreprise')->user();

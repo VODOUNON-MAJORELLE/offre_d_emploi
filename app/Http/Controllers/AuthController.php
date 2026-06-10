@@ -190,8 +190,30 @@ class AuthController extends Controller
                 ]);
         }
 
-        // Pour l'instant, on simule l'envoi d'un email
-        // Dans un vrai système, on utiliserait Laravel Password Reset
+        // Générer un token unique
+        $token = \Illuminate\Support\Str::random(60);
+
+        // Supprimer les anciens tokens pour cet email
+        \App\Models\PasswordReset::where('email', $email)->delete();
+
+        // Créer un nouveau token
+        \App\Models\PasswordReset::create([
+            'email' => $email,
+            'token' => $token,
+            'created_at' => now(),
+        ]);
+
+        // Envoyer l'email
+        $resetUrl = route('password.reset', ['token' => $token, 'email' => $email]);
+        
+        \Illuminate\Support\Facades\Mail::send('emails.password-reset', [
+            'resetUrl' => $resetUrl,
+            'email' => $email,
+        ], function ($message) use ($email) {
+            $message->to($email)
+                    ->subject('Réinitialisation de votre mot de passe - Talentlink');
+        });
+
         return back()->with('status', 'Un lien de réinitialisation a été envoyé à votre adresse email.');
     }
 
@@ -214,7 +236,31 @@ class AuthController extends Controller
         ]);
 
         $email = $request->input('email');
+        $token = $request->input('token');
         $password = $request->input('password');
+
+        // Vérifier si le token est valide
+        $passwordReset = \App\Models\PasswordReset::where('email', $email)
+            ->where('token', $token)
+            ->first();
+
+        if (!$passwordReset) {
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors([
+                    'email' => 'Le lien de réinitialisation est invalide ou a expiré.',
+                ]);
+        }
+
+        // Vérifier si le token n'a pas expiré (60 minutes)
+        if ($passwordReset->created_at->lt(now()->subMinutes(60))) {
+            $passwordReset->delete();
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors([
+                    'email' => 'Le lien de réinitialisation a expiré. Veuillez demander un nouveau lien.',
+                ]);
+        }
 
         // Vérifier si l'email existe dans candidat ou entreprise
         $candidat = \App\Models\Candidat::where('email', $email)->first();
@@ -238,6 +284,9 @@ class AuthController extends Controller
             $entreprise->mot_de_passe = \Illuminate\Support\Facades\Hash::make($password);
             $entreprise->save();
         }
+
+        // Supprimer le token utilisé
+        $passwordReset->delete();
 
         return redirect()->route('login')->with('status', 'Votre mot de passe a été réinitialisé avec succès.');
     }

@@ -437,8 +437,6 @@
   <div class="nav-links">
     @if($isCandidat)
       <a href="{{ route('candidat.feed') }}" class="nav-link">Feed</a>
-    @elseif($isEntreprise)
-      <a href="/" class="nav-link">Feed</a>
     @endif
     @if($isCandidat)
       <a href="{{ route('candidat.profil') }}" class="nav-link">Profil</a>
@@ -585,7 +583,7 @@
         @if($isCandidat)
           <a href="{{ route('candidat.entreprise.profil', ['id_entreprise' => $partner->id_entreprise]) }}" class="view-profile-btn">Voir profil <i class="ti ti-external-link" style="font-size:13px"></i></a>
         @elseif($isEntreprise)
-          <a href="#" class="view-profile-btn">Voir profil <i class="ti ti-external-link" style="font-size:13px"></i></a>
+          <a href="{{ route('candidats.show', ['id_candidat' => $partner->id_candidat]) }}" class="view-profile-btn">Voir profil <i class="ti ti-external-link" style="font-size:13px"></i></a>
         @endif
       @else
         <div class="chat-header-info">

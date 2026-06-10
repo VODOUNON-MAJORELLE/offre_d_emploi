@@ -112,15 +112,13 @@ nav{background:var(--card);border-bottom:0.5px solid var(--border);padding:0 28p
       @endphp
       @if($isCandidat)
         <a class="nav-link" href="{{ route('candidat.feed') }}">Feed</a>
-      @elseif($isEntreprise)
-        <a class="nav-link" href="/">Feed</a>
       @endif
       @if($isCandidat)
         <a class="nav-link" href="{{ route('candidat.profil') }}">Profil</a>
         <a class="nav-link" href="{{ route('candidat.dashboard') }}">Candidatures</a>
       @elseif($isEntreprise)
         <a class="nav-link" href="{{ route('entreprise.dashboard') }}">Dashboard</a>
-        <a class="nav-link" href="#">Profil</a>
+        <a class="nav-link" href="{{ route('entreprise.profil') }}">Profil</a>
       @endif
       <a class="nav-link active">Messagerie</a>
     </div>

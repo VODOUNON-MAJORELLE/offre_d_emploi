@@ -363,6 +363,13 @@
 </head>
 <body>
 
+@php
+  $isCandidat = \Illuminate\Support\Facades\Auth::guard('candidat')->check();
+  $isEntreprise = \Illuminate\Support\Facades\Auth::guard('entreprise')->check();
+  $entreprise = \Illuminate\Support\Facades\Auth::guard('entreprise')->user();
+@endphp
+
+@if($isCandidat)
 <nav>
   <div class="nav-left">
     <a href="/" class="nav-logo">
@@ -398,6 +405,43 @@
     </form>
   </div>
 </nav>
+@elseif($isEntreprise)
+<nav>
+  <div class="nav-left">
+    <a href="/" class="nav-logo">
+      <div class="logo-av">JR</div>
+      <span>Talentlink</span>
+    </a>
+    <div class="nav-links">
+      <a class="nav-link" href="{{ route('entreprise.dashboard') }}">Dashboard</a>
+      <a class="nav-link" href="{{ route('entreprise.profil') }}">Profil</a>
+      <a class="nav-link" href="{{ route('messagerie.index') }}">Messagerie</a>
+    </div>
+  </div>
+  <div class="nav-right">
+    @php
+      $unreadNotifCount = \App\Models\Notification::where('id_entreprise', $entreprise->id_entreprise)->where('statut_lecture', 'non lu')->count();
+      $initials = substr($entreprise->nom_entreprise, 0, 2);
+    @endphp
+    <a href="{{ route('notifications.index') }}" class="notif-btn">
+      <i class="ti ti-bell"></i>
+      @if($unreadNotifCount > 0)
+        <span class="notif-badge">{{ $unreadNotifCount }}</span>
+      @endif
+    </a>
+    @if($entreprise->logo_entreprise)
+      <div class="user-av" style="background-image: url('{{ asset('storage/' . $entreprise->logo_entreprise) }}'); background-size: cover; background-position: center;"></div>
+    @else
+      <div class="user-av">{{ $initials }}</div>
+    @endif
+    <form action="{{ route('logout') }}" method="POST" style="display:inline">
+      @csrf
+      <button type="submit" class="logout-btn"><i class="ti ti-logout"></i></button>
+    </form>
+  </div>
+</nav>
+@endif
+
 <div class="page-wrap">
 {{-- Success Message --}}
 @if(session('success'))
@@ -428,10 +472,12 @@
 
   <div class="page-header">
     <h1 class="page-title">Mon Profil</h1>
-    <div style="display:flex;gap:8px;">
-      <button type="button" id="btn-modifier" class="save-btn view-mode" onclick="enableEditing()"><i class="ti ti-edit"></i> Modifier</button>
-      <button type="submit" id="btn-enregistrer" class="save-btn edit-mode" style="display:none;"><i class="ti ti-check"></i> Enregistrer</button>
-    </div>
+    @if($isCandidat)
+      <div style="display:flex;gap:8px;">
+        <button type="button" id="btn-modifier" class="save-btn view-mode" onclick="enableEditing()"><i class="ti ti-edit"></i> Modifier</button>
+        <button type="submit" id="btn-enregistrer" class="save-btn edit-mode" style="display:none;"><i class="ti ti-check"></i> Enregistrer</button>
+      </div>
+    @endif
   </div>
 
   <div class="layout">
@@ -509,10 +555,12 @@
       <div class="card">
         <div class="card-section-header" style="margin-bottom:12px;">
           <div class="card-section-title" style="margin-bottom:0"><i class="ti ti-file-text"></i> Mon CV</div>
-          <span class="add-link" onclick="document.getElementById('cv-upload').click()"><i class="ti ti-upload"></i> Uploader</span>
+          @if($principalCv)
+            <a href="{{ route('cvs.download', ['id_cv' => $principalCv->id_cv]) }}" class="add-link"><i class="ti ti-download"></i> Télécharger</a>
+          @endif
         </div>
         @if($principalCv)
-          <div class="cv-row" onclick="window.open('{{ asset('storage/' . $principalCv->contenu_fichier) }}', '_blank')" style="cursor: pointer;" title="Cliquez pour afficher votre CV">
+          <div class="cv-row" @if(!$isEntreprise) onclick="window.open('{{ asset('storage/' . $principalCv->contenu_fichier) }}', '_blank')" style="cursor: pointer;" title="Cliquez pour afficher votre CV" @endif>
             <div class="cv-info">
               <i class="ti ti-file-description cv-icon"></i>
               <div>
@@ -522,21 +570,23 @@
             </div>
           </div>
         @else
-          <div class="cv-row" onclick="document.getElementById('cv-upload').click()" style="cursor: pointer;" title="Cliquez pour importer votre CV">
+          <div class="cv-row" @if(!$isEntreprise) onclick="document.getElementById('cv-upload').click()" style="cursor: pointer;" title="Cliquez pour importer votre CV" @endif>
             <div class="cv-info">
               <i class="ti ti-upload cv-icon"></i>
               <div>
                 <div class="cv-name">Aucun CV importé</div>
-                <div class="cv-date">Cliquez pour importer</div>
+                <div class="cv-date">@if($isEntreprise) Ce candidat n'a pas de CV @else Cliquez pour importer @endif</div>
               </div>
             </div>
           </div>
         @endif
-        <div id="cv-error" style="display:none; margin-top:10px; padding:8px 12px; background:#fef2f2; border:0.5px solid #fecaca; border-radius:8px; font-size:12px; color:#991b1b; align-items:center; gap:8px;">
-          <i class="ti ti-alert-circle" style="font-size:15px; flex-shrink:0;"></i>
-          <span>Le CV ne doit pas dépasser <strong>5 MB</strong>.</span>
-        </div>
-        <input type="file" id="cv-upload" name="cv_file" accept=".pdf,.doc,.docx" style="display:none" onchange="uploadCv(this)">
+        @if(!$isEntreprise)
+          <div id="cv-error" style="display:none; margin-top:10px; padding:8px 12px; background:#fef2f2; border:0.5px solid #fecaca; border-radius:8px; font-size:12px; color:#991b1b; align-items:center; gap:8px;">
+            <i class="ti ti-alert-circle" style="font-size:15px; flex-shrink:0;"></i>
+            <span>Le CV ne doit pas dépasser <strong>5 MB</strong>.</span>
+          </div>
+          <input type="file" id="cv-upload" name="cv_file" accept=".pdf,.doc,.docx" style="display:none" onchange="uploadCv(this)">
+        @endif
       </div>
 
     </div>
@@ -577,10 +627,7 @@
                 <div class="entry-desc">{{ $exp->description }}</div>
               @endif
             </div>
-            <form action="{{ route('candidat.experiences.destroy', $exp->id_experience) }}" method="POST" onsubmit="return confirm('Supprimer cette expérience ?')">
-              @csrf @method('DELETE')
-              <button type="submit" class="entry-delete" title="Supprimer"><i class="ti ti-trash"></i></button>
-            </form>
+            <button type="button" class="entry-delete" title="Supprimer" onclick="deleteExperience({{ $exp->id_experience }})"><i class="ti ti-trash"></i></button>
           </div>
         @empty
           <div class="empty-state">Aucune expérience ajoutée — <span style="color:var(--accent);cursor:pointer" onclick="openModal('modal-experience')">Ajouter</span></div>
@@ -603,10 +650,7 @@
                 <div class="entry-desc">{{ $form->description }}</div>
               @endif
             </div>
-            <form action="{{ route('candidat.formations.destroy', $form->id_formation) }}" method="POST" onsubmit="return confirm('Supprimer cette formation ?')">
-              @csrf @method('DELETE')
-              <button type="submit" class="entry-delete" title="Supprimer"><i class="ti ti-trash"></i></button>
-            </form>
+            <button type="button" class="entry-delete" title="Supprimer" onclick="deleteFormation({{ $form->id_formation }})"><i class="ti ti-trash"></i></button>
           </div>
         @empty
           <div class="empty-state">Aucune formation ajoutée — <span style="color:var(--accent);cursor:pointer" onclick="openModal('modal-formation')">Ajouter</span></div>
@@ -873,8 +917,56 @@
   }
   function closeModal(id) {
     document.getElementById(id).classList.remove('open');
-    document.body.style.overflow = '';
   }
+
+  function deleteExperience(id) {
+    if (confirm('Supprimer cette expérience ?')) {
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '{{ route('candidat.experiences.destroy', ':id') }}'.replace(':id', id);
+      form.style.display = 'none';
+      
+      const csrfInput = document.createElement('input');
+      csrfInput.type = 'hidden';
+      csrfInput.name = '_token';
+      csrfInput.value = '{{ csrf_token() }}';
+      form.appendChild(csrfInput);
+      
+      const methodInput = document.createElement('input');
+      methodInput.type = 'hidden';
+      methodInput.name = '_method';
+      methodInput.value = 'DELETE';
+      form.appendChild(methodInput);
+      
+      document.body.appendChild(form);
+      form.submit();
+    }
+  }
+
+  function deleteFormation(id) {
+    if (confirm('Supprimer cette formation ?')) {
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '{{ route('candidat.formations.destroy', ':id') }}'.replace(':id', id);
+      form.style.display = 'none';
+      
+      const csrfInput = document.createElement('input');
+      csrfInput.type = 'hidden';
+      csrfInput.name = '_token';
+      csrfInput.value = '{{ csrf_token() }}';
+      form.appendChild(csrfInput);
+      
+      const methodInput = document.createElement('input');
+      methodInput.type = 'hidden';
+      methodInput.name = '_method';
+      methodInput.value = 'DELETE';
+      form.appendChild(methodInput);
+      
+      document.body.appendChild(form);
+      form.submit();
+    }
+  }
+
   // Close modal on overlay click
   document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
     overlay.addEventListener('click', function(e) {

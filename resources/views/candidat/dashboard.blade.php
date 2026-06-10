@@ -220,7 +220,7 @@ nav{background:var(--card);border-bottom:0.5px solid var(--border);padding:0 28p
       <div class="cta-icon"><i class="ti ti-plus"></i></div>
       <div class="cta-title">Postulez à plus d'offres</div>
       <div class="cta-sub">Augmentez vos chances en postulant à plusieurs offres correspondant à votre profil.</div>
-      <a href="/" class="cta-btn">Explorer les offres</a>
+      <a href="{{ route('candidat.feed') }}" class="cta-btn">Explorer les offres</a>
     </div>
   @endforelse
 </div>

@@ -189,16 +189,22 @@ td{padding:13px 10px;vertical-align:middle}
       </div>
       <div style="display:flex;gap:8px">
         <a href="{{ route('entreprise.offres.edit', ['id_offre' => $offre->id_offre]) }}" class="modifier-btn"><i class="ti ti-edit"></i> Modifier</a>
-        @if($offre->statut_offre === 'active')
+        
+        @if($offre->statut_offre !== 'suspendue' && $offre->statut_offre !== 'clôturée')
           <form action="{{ route('entreprise.offres.suspend', ['id_offre' => $offre->id_offre]) }}" method="POST" style="display:inline">
             @csrf
             <button type="submit" class="modifier-btn" style="color:#f59e0b" onclick="return confirm('Voulez-vous vraiment suspendre cette offre ?')"><i class="ti ti-player-pause"></i> Suspendre</button>
           </form>
+        @endif
+
+        @if($offre->statut_offre !== 'clôturée')
           <form action="{{ route('entreprise.offres.close', ['id_offre' => $offre->id_offre]) }}" method="POST" style="display:inline">
             @csrf
             <button type="submit" class="modifier-btn" style="color:#ef4444" onclick="return confirm('Voulez-vous vraiment clôturer cette offre ?')"><i class="ti ti-x"></i> Clôturer</button>
           </form>
-        @elseif($offre->statut_offre === 'suspendue' || $offre->statut_offre === 'clôturée')
+        @endif
+
+        @if($offre->statut_offre === 'suspendue' || $offre->statut_offre === 'clôturée')
           <form action="{{ route('entreprise.offres.reactivate', ['id_offre' => $offre->id_offre]) }}" method="POST" style="display:inline">
             @csrf
             <button type="submit" class="modifier-btn" style="color:#10b981" onclick="return confirm('Voulez-vous vraiment réactiver cette offre ?')"><i class="ti ti-player-play"></i> Réactiver</button>
@@ -212,13 +218,13 @@ td{padding:13px 10px;vertical-align:middle}
       
       // Calculer les jours restants correctement
       if ($offre->date_limite) {
-        $diff = ceil($offre->date_limite->diffInDays(now()));
-        if ($diff >= 0) {
+        if ($offre->date_limite->isFuture()) {
+          $diff = ceil(now()->diffInHours($offre->date_limite) / 24);
           $joursRestants = $diff;
-          $joursLabel = $diff == 1 ? 'Jour restant' : 'Jours restants';
+          $joursLabel = $diff <= 1 ? 'Jour restant' : 'Jours restants';
         } else {
-          $joursRestants = abs($diff);
-          $joursLabel = abs($diff) == 1 ? 'Jour écoulé' : 'Jours écoulés';
+          $joursRestants = 0;
+          $joursLabel = 'Jours restants';
         }
       } else {
         $joursRestants = null;
