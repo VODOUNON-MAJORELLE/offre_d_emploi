@@ -52,7 +52,7 @@ nav.entreprise-nav{background:#fff;border-bottom:0.5px solid #e0e0e0;padding:0 2
 .offre-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .meta-item{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--t2)}
 .badge-cdi{background:#d1fae5;color:#065f46;font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px}
-.modifier-btn{margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border:0.5px solid var(--border);border-radius:var(--rs);background:var(--card);font-size:13px;font-weight:500;font-family:inherit;color:var(--t1);cursor:pointer;transition:background .12s;white-space:nowrap}
+.modifier-btn{margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border:0.5px solid var(--border);border-radius:var(--rs);background:var(--card);font-size:13px;font-weight:500;font-family:inherit;color:var(--t1);cursor:pointer;transition:background .12s;white-space:nowrap;pointer-events:auto;text-decoration:none}
 .modifier-btn:hover{background:#f5f6fa}
 
 .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:0.5px solid var(--border);padding-top:18px;text-align:center}

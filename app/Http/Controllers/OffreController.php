@@ -19,7 +19,16 @@ class OffreController extends Controller
         $entreprise = Auth::guard('entreprise')->user();
         $offre = Offre::where('id_entreprise', $entreprise->id_entreprise)->findOrFail($id_offre);
         $etapes = \App\Models\EtapeOffre::where('id_offre', $id_offre)->orderBy('ordre_etape')->get();
-        return view('entreprise.offre-edit', compact('offre', 'etapes'));
+        
+        // Load questionnaire and questions if they exist
+        $questionnaire = null;
+        $questions = [];
+        if ($offre->questionnaire) {
+            $questionnaire = $offre->questionnaire;
+            $questions = $questionnaire->questions()->with('options')->get();
+        }
+        
+        return view('entreprise.offre-edit', compact('offre', 'etapes', 'questionnaire', 'questions'));
     }
 
     /**
@@ -34,7 +43,7 @@ class OffreController extends Controller
             'titre_offre' => 'required|string|max:255',
             'ville_poste' => 'required|string|max:255',
             'pays' => 'nullable|string|max:255',
-            'description_offre' => 'required|string',
+            'description_offre' => 'nullable|string',
             'type_contrat' => 'nullable|string|max:50',
             'teletravail' => 'nullable|string|max:50',
             'niveau_etudes_requis' => 'nullable|in:Bac,Licence,Master,Doctorat',
@@ -106,15 +115,18 @@ class OffreController extends Controller
                             'enonce_question' => $qData['q'],
                             'type_question' => $qData['t'] === 'qcm' ? 'QCM' : 'reponse_courte',
                             'points_question' => (int) ($qData['points'] ?? 10),
+                            'mots_cles' => isset($qData['keywords']) ? $qData['keywords'] : null,
                         ]);
 
                         // Create options for QCM questions
                         if ($qData['t'] === 'qcm' && isset($qData['options']) && is_array($qData['options'])) {
-                            foreach ($qData['options'] as $optIndex => $optionText) {
+                            foreach ($qData['options'] as $optIndex => $optionData) {
+                                $optionText = is_array($optionData) ? $optionData['text'] : $optionData;
+                                $isCorrect = is_array($optionData) && isset($optionData['isCorrect']) ? $optionData['isCorrect'] : false;
                                 \App\Models\OptionReponse::create([
                                     'id_question' => $question->id_question,
                                     'contenu_option' => $optionText,
-                                    'est_bonne_reponse' => false, // Default to false, can be modified later
+                                    'est_bonne_reponse' => $isCorrect,
                                     'ordre_option' => $optIndex + 1,
                                 ]);
                             }
@@ -259,15 +271,18 @@ class OffreController extends Controller
                             'enonce_question' => $qData['q'],
                             'type_question' => $qData['t'] === 'qcm' ? 'QCM' : 'reponse_courte',
                             'points_question' => (int) ($qData['points'] ?? 10),
+                            'mots_cles' => isset($qData['keywords']) ? $qData['keywords'] : null,
                         ]);
 
                         // Create options for QCM questions
                         if ($qData['t'] === 'qcm' && isset($qData['options']) && is_array($qData['options'])) {
-                            foreach ($qData['options'] as $optIndex => $optionText) {
+                            foreach ($qData['options'] as $optIndex => $optionData) {
+                                $optionText = is_array($optionData) ? $optionData['text'] : $optionData;
+                                $isCorrect = is_array($optionData) && isset($optionData['isCorrect']) ? $optionData['isCorrect'] : false;
                                 \App\Models\OptionReponse::create([
                                     'id_question' => $question->id_question,
                                     'contenu_option' => $optionText,
-                                    'est_bonne_reponse' => false, // Default to false, can be modified later
+                                    'est_bonne_reponse' => $isCorrect,
                                     'ordre_option' => $optIndex + 1,
                                 ]);
                             }

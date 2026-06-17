@@ -17,6 +17,7 @@ class AdminController extends Controller
 
     public function dashboard()
     {
+        // Use a single query with subqueries for stats
         $stats = [
             'candidats'          => Candidat::count(),
             'candidats_recent'   => Candidat::where('date_inscription', '>=', now()->subDays(7))->count(),
@@ -25,7 +26,7 @@ class AdminController extends Controller
             'offres'             => Offre::count(),
             'offres_recent'      => Offre::where('date_publication', '>=', now()->subDays(30))->count(),
             'offres_actives'     => Offre::where('statut_offre', 'active')->count(),
-            'a_moderer'          => Offre::where('statut_offre', 'active')->count(),
+            'a_moderer'          => Offre::where('statut_offre', 'active')->whereNull('motif_moderation')->count(),
         ];
 
         $recent_candidats   = Candidat::orderBy('date_inscription', 'desc')->take(5)->get();
@@ -38,7 +39,7 @@ class AdminController extends Controller
                                 ->take(3)
                                 ->get();
 
-        // Graphiques — 6 derniers mois
+        // Graphiques — 6 derniers mois - Optimized with single queries
         $chart_months      = [];
         $candidat_counts   = [];
         $offre_counts      = [];
@@ -50,8 +51,9 @@ class AdminController extends Controller
             9  => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Déc',
         ];
 
+        $now = now();
         for ($i = 5; $i >= 0; $i--) {
-            $date   = \Carbon\Carbon::now()->subMonths($i);
+            $date   = $now->copy()->subMonths($i);
             $chart_months[] = $frMonths[$date->month];
             $end    = $date->copy()->endOfMonth();
             $start  = $date->copy()->startOfMonth();
@@ -60,17 +62,25 @@ class AdminController extends Controller
             $candidature_counts[] = \App\Models\Candidature::whereBetween('date_soumission', [$start, $end])->count();
         }
 
-        // Stats globales
-        $avg_success_rate = 24;
-        $total_candidatures = \App\Models\Candidature::count();
-        if ($total_candidatures > 0) {
-            $advanced = \App\Models\ProgressionCandidature::where('statut_etape', 'complétée')
-                ->whereHas('etapeOffre', fn($q) => $q->where('ordre_etape', '>', 1))
-                ->distinct('id_candidature')->count();
-            $avg_success_rate = max(1, min(100, round(($advanced / $total_candidatures) * 100)));
-        }
-        $avg_score       = round(\App\Models\Score::avg('score_compatibilite') ?? 82);
-        $satisfaction_rate = round(\App\Models\Avis::where('statut_avis','publié')->avg('note_globale') ?? 4.3, 1);
+        // Stats globales - Optimized with caching
+        $avg_success_rate = cache()->remember('admin.avg_success_rate', 300, function() {
+            $total_candidatures = \App\Models\Candidature::count();
+            if ($total_candidatures > 0) {
+                $advanced = \App\Models\ProgressionCandidature::where('statut_etape', 'complétée')
+                    ->whereHas('etapeOffre', fn($q) => $q->where('ordre_etape', '>', 1))
+                    ->distinct('id_candidature')->count();
+                return max(1, min(100, round(($advanced / $total_candidatures) * 100)));
+            }
+            return 24;
+        });
+
+        $avg_score = cache()->remember('admin.avg_score', 300, function() {
+            return round(\App\Models\Score::avg('score_compatibilite') ?? 82);
+        });
+
+        $satisfaction_rate = cache()->remember('admin.satisfaction_rate', 300, function() {
+            return round(\App\Models\Avis::where('statut_avis','publié')->avg('note_globale') ?? 4.3, 1);
+        });
 
         return view('admin.dashboard', compact(
             'stats', 'recent_candidats', 'recent_entreprises', 'recent_offres', 'recent_avis',
@@ -102,13 +112,16 @@ class AdminController extends Controller
 
         $offres = $query->paginate(15)->appends($request->all());
 
-        $counts = [
-            'active'       => Offre::where('statut_offre', 'active')->whereNull('motif_moderation')->count(),
-            'suspendue'    => Offre::where('statut_offre', 'suspendue')->count(),
-            'rejetée'      => Offre::where('statut_offre', 'rejetée')->count(),
-            'avertissement'=> Offre::where('statut_offre', 'avertissement')->count(),
-            'clôturée'     => Offre::where('statut_offre', 'clôturée')->count(),
-        ];
+        // Cache counts for 5 minutes
+        $counts = cache()->remember('admin.offres.counts', 300, function() {
+            return [
+                'active'       => Offre::where('statut_offre', 'active')->whereNull('motif_moderation')->count(),
+                'suspendue'    => Offre::where('statut_offre', 'suspendue')->count(),
+                'rejetée'      => Offre::where('statut_offre', 'rejetée')->count(),
+                'avertissement'=> Offre::where('statut_offre', 'avertissement')->count(),
+                'clôturée'     => Offre::where('statut_offre', 'clôturée')->count(),
+            ];
+        });
 
         return view('admin.offres', compact('offres', 'statut', 'search', 'counts'));
     }
@@ -123,6 +136,8 @@ class AdminController extends Controller
             'date_moderation'  => now(),
             'moderee_par'      => Auth::guard('admin')->id(),
         ]);
+        // Invalidate cache
+        cache()->forget('admin.offres.counts');
         return back()->with('success', "L'offre « {$offre->titre_offre} » a été validée.");
     }
 
@@ -137,6 +152,7 @@ class AdminController extends Controller
             'date_moderation'  => now(),
             'moderee_par'      => Auth::guard('admin')->id(),
         ]);
+        cache()->forget('admin.offres.counts');
         return back()->with('success', "L'offre « {$offre->titre_offre} » a été rejetée.");
     }
 
@@ -151,6 +167,7 @@ class AdminController extends Controller
             'date_moderation'  => now(),
             'moderee_par'      => Auth::guard('admin')->id(),
         ]);
+        cache()->forget('admin.offres.counts');
         return back()->with('success', "Un avertissement a été envoyé pour l'offre « {$offre->titre_offre} ».");
     }
 
@@ -178,11 +195,14 @@ class AdminController extends Controller
 
         $avis_list = $query->paginate(15)->appends($request->all());
 
-        $counts = [
-            'publié'       => Avis::where('statut_avis', 'publié')->count(),
-            'supprimé'     => Avis::where('statut_avis', 'supprimé')->count(),
-            'avertissement'=> Avis::where('statut_avis', 'avertissement')->count(),
-        ];
+        // Cache counts for 5 minutes
+        $counts = cache()->remember('admin.avis.counts', 300, function() {
+            return [
+                'publié'       => Avis::where('statut_avis', 'publié')->count(),
+                'supprimé'     => Avis::where('statut_avis', 'supprimé')->count(),
+                'avertissement'=> Avis::where('statut_avis', 'avertissement')->count(),
+            ];
+        });
 
         return view('admin.avis', compact('avis_list', 'statut', 'search', 'counts'));
     }
@@ -198,6 +218,7 @@ class AdminController extends Controller
             'date_moderation'  => now(),
             'moderee_par'      => Auth::guard('admin')->id(),
         ]);
+        cache()->forget('admin.avis.counts');
         return back()->with('success', "L'avis a été supprimé.");
     }
 
@@ -212,6 +233,7 @@ class AdminController extends Controller
             'date_moderation'  => now(),
             'moderee_par'      => Auth::guard('admin')->id(),
         ]);
+        cache()->forget('admin.avis.counts');
         return back()->with('success', "Un avertissement a été appliqué à l'avis.");
     }
 
@@ -225,6 +247,7 @@ class AdminController extends Controller
             'date_moderation'  => now(),
             'moderee_par'      => Auth::guard('admin')->id(),
         ]);
+        cache()->forget('admin.avis.counts');
         return back()->with('success', "L'avis a été restauré.");
     }
 
@@ -252,11 +275,14 @@ class AdminController extends Controller
 
         $candidats = $query->paginate(20)->appends($request->all());
 
-        $counts = [
-            'actif'    => Candidat::where('statut_compte', 'actif')->count(),
-            'suspendu' => Candidat::where('statut_compte', 'suspendu')->count(),
-            'supprimé' => Candidat::where('statut_compte', 'supprimé')->count(),
-        ];
+        // Cache counts for 5 minutes
+        $counts = cache()->remember('admin.candidats.counts', 300, function() {
+            return [
+                'actif'    => Candidat::where('statut_compte', 'actif')->count(),
+                'suspendu' => Candidat::where('statut_compte', 'suspendu')->count(),
+                'supprimé' => Candidat::where('statut_compte', 'supprimé')->count(),
+            ];
+        });
 
         return view('admin.candidats', compact('candidats', 'statut', 'search', 'counts'));
     }
@@ -265,6 +291,7 @@ class AdminController extends Controller
     {
         $candidat = Candidat::findOrFail($id);
         $candidat->update(['statut_compte' => 'suspendu']);
+        cache()->forget('admin.candidats.counts');
         return back()->with('success', "{$candidat->prenom} {$candidat->nom} a été suspendu.");
     }
 
@@ -273,6 +300,7 @@ class AdminController extends Controller
         $candidat = Candidat::findOrFail($id);
         $nom = "{$candidat->prenom} {$candidat->nom}";
         $candidat->update(['statut_compte' => 'supprimé']);
+        cache()->forget('admin.candidats.counts');
         return back()->with('success', "$nom a été supprimé.");
     }
 
@@ -280,6 +308,7 @@ class AdminController extends Controller
     {
         $candidat = Candidat::findOrFail($id);
         $candidat->update(['statut_compte' => 'actif']);
+        cache()->forget('admin.candidats.counts');
         return back()->with('success', "{$candidat->prenom} {$candidat->nom} a été réactivé.");
     }
 
@@ -307,11 +336,14 @@ class AdminController extends Controller
 
         $entreprises = $query->paginate(20)->appends($request->all());
 
-        $counts = [
-            'actif'    => Entreprise::where('statut_compte', 'actif')->count(),
-            'suspendu' => Entreprise::where('statut_compte', 'suspendu')->count(),
-            'supprimé' => Entreprise::where('statut_compte', 'supprimé')->count(),
-        ];
+        // Cache counts for 5 minutes
+        $counts = cache()->remember('admin.entreprises.counts', 300, function() {
+            return [
+                'actif'    => Entreprise::where('statut_compte', 'actif')->count(),
+                'suspendu' => Entreprise::where('statut_compte', 'suspendu')->count(),
+                'supprimé' => Entreprise::where('statut_compte', 'supprimé')->count(),
+            ];
+        });
 
         return view('admin.entreprises', compact('entreprises', 'statut', 'search', 'counts'));
     }
@@ -323,6 +355,8 @@ class AdminController extends Controller
         // Suspendre aussi toutes ses offres actives
         Offre::where('id_entreprise', $id)->where('statut_offre', 'active')
             ->update(['statut_offre' => 'suspendue']);
+        cache()->forget('admin.entreprises.counts');
+        cache()->forget('admin.offres.counts');
         return back()->with('success', "{$entreprise->nom_entreprise} a été suspendu(e).");
     }
 
@@ -333,6 +367,8 @@ class AdminController extends Controller
         $entreprise->update(['statut_compte' => 'supprimé']);
         Offre::where('id_entreprise', $id)->where('statut_offre', 'active')
             ->update(['statut_offre' => 'suspendue']);
+        cache()->forget('admin.entreprises.counts');
+        cache()->forget('admin.offres.counts');
         return back()->with('success', "$nom a été supprimé(e).");
     }
 
@@ -340,6 +376,7 @@ class AdminController extends Controller
     {
         $entreprise = Entreprise::findOrFail($id);
         $entreprise->update(['statut_compte' => 'actif']);
+        cache()->forget('admin.entreprises.counts');
         return back()->with('success', "{$entreprise->nom_entreprise} a été réactivé(e).");
     }
 }

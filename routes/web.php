@@ -14,7 +14,8 @@ Route::get('/', [HomeController::class, 'index'])->name('home');
 
 // Feed public - liste des offres sans possibilité de postuler
 Route::get('/feed/public', function () {
-    $offres = \App\Models\Offre::where('statut_offre', 'active')
+    $offres = \App\Models\Offre::with('entreprise')
+        ->where('statut_offre', 'active')
         ->orderByDesc('date_publication')
         ->get();
     return view('feed', compact('offres'));
@@ -84,7 +85,6 @@ Route::middleware(['auth:candidat', 'check_status'])->group(function () {
             'offre.entreprise',
             'progressions.etapeOffre',
             'avis',
-            'candidat.scores'
         ])
             ->where('id_candidat', $candidat->id_candidat)
             ->orderByDesc('date_soumission')
@@ -122,7 +122,7 @@ Route::middleware(['auth:candidat', 'check_status'])->group(function () {
 
     // Vue profil entreprise (côté candidat)
     Route::get('/entreprise/{id_entreprise}/voir', function ($id_entreprise) {
-        $entreprise = \App\Models\Entreprise::findOrFail($id_entreprise);
+        $entreprise = \App\Models\Entreprise::withCount('offres')->findOrFail($id_entreprise);
         return view('entreprise.profil', compact('entreprise'));
     })->name('candidat.entreprise.profil');
 
@@ -189,14 +189,17 @@ Route::middleware(['auth:entreprise', 'check_status'])->group(function () {
 
     // Profil entreprise public (accessible aux candidats)
     Route::get('/entreprises/{id_entreprise}', function ($id_entreprise) {
-        $entreprise = \App\Models\Entreprise::findOrFail($id_entreprise);
+        $entreprise = \App\Models\Entreprise::withCount('offres')->findOrFail($id_entreprise);
         return view('entreprise.profil', compact('entreprise'));
     })->name('entreprises.show');
 
     // Profil candidat public (accessible aux entreprises)
     Route::get('/candidats/{id_candidat}', function ($id_candidat) {
-        $candidat = \App\Models\Candidat::findOrFail($id_candidat);
-        $cvs = $candidat->cvs()->where('statut', 'actif')->orderByDesc('date_upload')->get();
+        $candidat = \App\Models\Candidat::with(['cvs' => function($query) {
+            $query->where('statut', 'actif')->orderByDesc('date_upload');
+        }])->findOrFail($id_candidat);
+        
+        $cvs = $candidat->cvs;
         $principalCv = $candidat->principalCv;
         $competences = array_filter(array_map('trim', explode(',', $candidat->competences ?? '')));
 
@@ -261,7 +264,7 @@ Route::middleware(['auth:entreprise', 'check_status'])->group(function () {
     // Détail d'une candidature
     Route::get('/entreprise/candidatures/{id_candidature}', function ($id_candidature) {
         $entreprise = \Illuminate\Support\Facades\Auth::guard('entreprise')->user();
-        $candidature = \App\Models\Candidature::with(['candidat', 'offre.questionnaire.questions.options', 'progressions.etapeOffre', 'reponses.question'])
+        $candidature = \App\Models\Candidature::with(['candidat', 'offre.entreprise', 'offre.questionnaire.questions.options', 'progressions.etapeOffre', 'reponses.question'])
             ->whereHas('offre', function($query) use ($entreprise) {
                 $query->where('id_entreprise', $entreprise->id_entreprise);
             })
@@ -272,11 +275,10 @@ Route::middleware(['auth:entreprise', 'check_status'])->group(function () {
     // Candidatures reçues par offre
     Route::get('/entreprise/offres/{id_offre}/candidatures', function ($id_offre) {
         $entreprise = \Illuminate\Support\Facades\Auth::guard('entreprise')->user();
-        $offre = \App\Models\Offre::where('id_entreprise', $entreprise->id_entreprise)->findOrFail($id_offre);
+        $offre = \App\Models\Offre::with('entreprise')->where('id_entreprise', $entreprise->id_entreprise)->findOrFail($id_offre);
         $candidatures = \App\Models\Candidature::with([
-            'candidat.scores',
+            'candidat',
             'progressions.etapeOffre',
-            'offre.entreprise'
         ])
             ->where('id_offre', $id_offre)
             ->orderByDesc('score_final')

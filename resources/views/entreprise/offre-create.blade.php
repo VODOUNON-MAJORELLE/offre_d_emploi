@@ -478,7 +478,11 @@ textarea.f-input{resize:vertical;min-height:110px;line-height:1.6}
       <div class="field-label">Barème de points</div>
       <input id="m-points" class="f-input" type="number" placeholder="Ex: 10" min="0" value="10">
     </div>
-    <div class="field" id="options-field">
+    <div class="field hidden" id="keywords-field">
+      <div class="field-label">Bonne réponse</div>
+      <input id="m-keywords" class="f-input" type="text" placeholder="Ex: React, JavaScript, Frontend">
+    </div>
+    <div class="field hidden" id="options-field">
       <div class="field-label">Choix de réponse <span style="color:var(--accent)">*</span></div>
       <div id="options-list"></div>
       <div class="skill-row" style="margin-top:8px">
@@ -535,16 +539,21 @@ function removeSkill(i) { skills.splice(i, 1); renderSkills(); }
 function toggleOptionsField() {
   const type = document.getElementById('m-type').value;
   const optionsField = document.getElementById('options-field');
+  const keywordsField = document.getElementById('keywords-field');
   if (type === 'text') {
     optionsField.classList.add('hidden');
+    keywordsField.classList.remove('hidden');
   } else {
     optionsField.classList.remove('hidden');
+    keywordsField.classList.add('hidden');
   }
 }
 
 function openModal() {
   document.getElementById('m-question').value = '';
-  document.getElementById('m-type').value = 'radio';
+  document.getElementById('m-type').value = 'text';
+  document.getElementById('m-points').value = '10';
+  document.getElementById('m-keywords').value = '';
   currentOptions.length = 0;
   renderOptions();
   toggleOptionsField();
@@ -564,7 +573,7 @@ function addOption() {
   const inp = document.getElementById('option-inp');
   const val = inp.value.trim();
   if (!val) return;
-  currentOptions.push(val);
+  currentOptions.push({ text: val, isCorrect: false });
   renderOptions();
   inp.value = '';
 }
@@ -572,19 +581,31 @@ function addOption() {
 function renderOptions() {
   const list = document.getElementById('options-list');
   list.innerHTML = currentOptions.map((opt, i) =>
-    `<div class="tag" style="margin-bottom:4px">${opt} <span class="tag-rm" onclick="removeOption(${i})">×</span></div>`
+    `<div class="tag" style="margin-bottom:4px;display:flex;align-items:center;gap:8px">
+      <input type="radio" name="correct-option" onchange="setCorrectOption(${i})" ${opt.isCorrect ? 'checked' : ''}>
+      <span>${opt.text}</span>
+      <span class="tag-rm" onclick="removeOption(${i})">×</span>
+    </div>`
   ).join('');
 }
 
-function removeOption(i) { 
-  currentOptions.splice(i, 1); 
-  renderOptions(); 
+function setCorrectOption(index) {
+  currentOptions.forEach((opt, i) => {
+    opt.isCorrect = (i === index);
+  });
+  renderOptions();
+}
+
+function removeOption(i) {
+  currentOptions.splice(i, 1);
+  renderOptions();
 }
 
 function addQuestion() {
   const q = document.getElementById('m-question').value.trim();
   const t = document.getElementById('m-type').value;
   const points = parseInt(document.getElementById('m-points').value) || 10;
+  const keywords = document.getElementById('m-keywords').value.trim();
   if (!q) return;
   
   if (t !== 'text' && currentOptions.length === 0) {
@@ -592,7 +613,15 @@ function addQuestion() {
     return;
   }
   
-  questions.push({ q, t, points, options: t !== 'text' ? [...currentOptions] : [] });
+  if (t === 'qcm') {
+    const hasCorrect = currentOptions.some(opt => opt.isCorrect);
+    if (!hasCorrect) {
+      alert('Veuillez sélectionner la bonne réponse pour le QCM.');
+      return;
+    }
+  }
+  
+  questions.push({ q, t, points, options: t !== 'text' ? [...currentOptions] : [], keywords: t === 'text' ? keywords : '' });
   renderQuestions();
   closeModal();
 }
@@ -621,9 +650,17 @@ function editQ(i) {
   document.getElementById('m-question').value = item.q;
   document.getElementById('m-type').value = item.t;
   document.getElementById('m-points').value = item.points;
+  document.getElementById('m-keywords').value = item.keywords || '';
   currentOptions.length = 0;
   if (item.options) {
-    item.options.forEach(opt => currentOptions.push(opt));
+    item.options.forEach(opt => {
+      // Handle both old format (string) and new format (object with text and isCorrect)
+      if (typeof opt === 'string') {
+        currentOptions.push({ text: opt, isCorrect: false });
+      } else {
+        currentOptions.push(opt);
+      }
+    });
   }
   renderOptions();
   toggleOptionsField();

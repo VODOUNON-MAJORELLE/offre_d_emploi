@@ -223,10 +223,35 @@ class CandidatureController extends Controller
                         }
                         $earnedQuestionnairePoints += $scoreReponse;
                     } else {
-                        // Response courte
+                        // Response courte - auto-grade based on keywords
                         $reponseText = $answers[$question->id_question] ?? '';
-                        $isCorrect = null; // evaluated manually by recruteur
-                        $scoreReponse = 0; // starts at 0 until graded
+                        $isCorrect = null;
+                        $scoreReponse = 0;
+                        
+                        // Auto-grade if keywords are defined
+                        if (!empty($question->mots_cles)) {
+                            $keywords = array_map('trim', explode(',', $question->mots_cles));
+                            $keywords = array_filter($keywords); // Remove empty values
+                            
+                            if (count($keywords) > 0) {
+                                $reponseTextLower = strtolower($reponseText);
+                                $matchedKeywords = 0;
+                                
+                                foreach ($keywords as $keyword) {
+                                    if (stripos($reponseTextLower, strtolower($keyword)) !== false) {
+                                        $matchedKeywords++;
+                                    }
+                                }
+                                
+                                // Calculate score: (matched_keywords / total_keywords) * points
+                                if ($matchedKeywords > 0) {
+                                    $scoreReponse = ($matchedKeywords / count($keywords)) * $question->points_question;
+                                    $isCorrect = ($matchedKeywords === count($keywords)); // Correct only if all keywords matched
+                                }
+                                
+                                $earnedQuestionnairePoints += $scoreReponse;
+                            }
+                        }
                     }
 
                     Reponse::create([

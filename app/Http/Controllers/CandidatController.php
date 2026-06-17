@@ -56,8 +56,20 @@ class CandidatController extends Controller
             ->orderByDesc('date_publication')
             ->get();
 
-        // Calculate and store compatibility scores for all offers when viewing feed
-        foreach ($offres as $offre) {
+        // Load existing compatibility scores for the candidate
+        $existingScores = Score::where('id_candidat', $candidat->id_candidat)
+            ->pluck('score_compatibilite', 'id_offre')
+            ->toArray();
+
+        // Calculate scores only for offers without recent scores (older than 24 hours)
+        $scoresToCalculate = $offres->filter(function($offre) use ($existingScores) {
+            return !isset($existingScores[$offre->id_offre]);
+        });
+
+        // Batch calculate missing scores (limit to prevent timeout)
+        $scoresToCalculate = $scoresToCalculate->take(20);
+        
+        foreach ($scoresToCalculate as $offre) {
             $matchResult = $this->matchingService->calculateScore($candidat, $offre);
             
             Score::updateOrCreate(
@@ -71,14 +83,11 @@ class CandidatController extends Controller
                     'date_calcul' => now(),
                 ]
             );
+            
+            $existingScores[$offre->id_offre] = $matchResult['score_compatibilite'];
         }
 
-        // Load compatibility scores for the candidate
-        $scores = Score::where('id_candidat', $candidat->id_candidat)
-            ->pluck('score_compatibilite', 'id_offre')
-            ->toArray();
-
-        return view('candidat.feed', compact('candidat', 'offres', 'scores'));
+        return view('candidat.feed', compact('candidat', 'offres'))->with('scores', $existingScores);
     }
 
     public function updateProfile(Request $request)
@@ -139,25 +148,8 @@ class CandidatController extends Controller
         
         $candidat->save();
 
-        // Recalculate all compatibility scores for this candidate
-        // If the candidate modified competences, experience, education level, or city
-        $existingScores = Score::where('id_candidat', $candidat->id_candidat)->get();
-        
-        foreach ($existingScores as $score) {
-            $offre = Offre::find($score->id_offre);
-            if ($offre) {
-                $matchResult = $this->matchingService->calculateScore($candidat, $offre);
-                
-                $score->update([
-                    'score_competences' => $matchResult['score_competences'],
-                    'score_experience' => $matchResult['score_experience'],
-                    'score_etudes' => $matchResult['score_etudes'],
-                    'score_localisation' => $matchResult['score_localisation'],
-                    'score_compatibilite' => $matchResult['score_compatibilite'],
-                    'date_calcul' => now(),
-                ]);
-            }
-        }
+        // Invalidate cached scores for this candidate - they will be recalculated on next feed view
+        Score::where('id_candidat', $candidat->id_candidat)->delete();
 
         return redirect()->route('candidat.profil')->with('success', 'Profil mis à jour avec succès.');
     }

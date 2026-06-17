@@ -14,6 +14,7 @@ class Question extends Model
         'enonce_question',
         'type_question',
         'points_question',
+        'mots_cles',
     ];
 
     protected $casts = [

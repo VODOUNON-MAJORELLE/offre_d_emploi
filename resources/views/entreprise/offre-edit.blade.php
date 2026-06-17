@@ -165,7 +165,7 @@ textarea.f-input{resize:vertical;min-height:110px;line-height:1.6}
 </nav>
 
 <!-- FORM -->
-<form action="{{ route('entreprise.offres.update', ['id_offre' => $offre->id_offre]) }}" method="POST" id="offre-form" onsubmit="prepareSubmit();">
+<form action="{{ route('entreprise.offres.update', ['id_offre' => $offre->id_offre]) }}" method="POST" id="offre-form" onsubmit="prepareSubmit();" novalidate>
   @csrf
   @method('PUT')
   <input type="hidden" name="competences_requises" id="competences-input">
@@ -191,11 +191,11 @@ textarea.f-input{resize:vertical;min-height:110px;line-height:1.6}
 
     <div class="field" style="margin-top:16px">
       <div class="field-label">Titre du poste <span>*</span></div>
-      <input id="f-titre" name="titre_offre" class="f-input" type="text" value="{{ $offre->titre_offre }}" required>
+      <input id="f-titre" name="titre_offre" class="f-input" type="text" value="{{ $offre->titre_offre }}">
     </div>
     <div class="field">
       <div class="field-label">Localisation <span>*</span></div>
-      <input id="f-loc" name="ville_poste" class="f-input" type="text" value="{{ $offre->ville_poste }}" required>
+      <input id="f-loc" name="ville_poste" class="f-input" type="text" value="{{ $offre->ville_poste }}">
     </div>
     <div class="field">
       <div class="field-label">Fourchette salariale</div>
@@ -248,8 +248,8 @@ textarea.f-input{resize:vertical;min-height:110px;line-height:1.6}
       </select>
     </div>
     <div class="field">
-      <div class="field-label">Description du poste <span>*</span></div>
-      <textarea id="f-desc" name="description_offre" class="f-input" placeholder="Décrivez le poste, les missions, l'environnement de travail..." required>{{ $offre->description_offre }}</textarea>
+      <div class="field-label">Description du poste</div>
+      <textarea id="f-desc" name="description_offre" class="f-input" placeholder="Décrivez le poste, les missions, l'environnement de travail...">{{ $offre->description_offre }}</textarea>
     </div>
     <div class="field">
       <div class="field-label">Compétences requises</div>
@@ -382,7 +382,11 @@ textarea.f-input{resize:vertical;min-height:110px;line-height:1.6}
       <div class="field-label">Barème de points</div>
       <input id="m-points" class="f-input" type="number" placeholder="Ex: 10" min="0" value="10">
     </div>
-    <div class="field" id="options-field">
+    <div class="field hidden" id="keywords-field">
+      <div class="field-label">Bonne réponse</div>
+      <input id="m-keywords" class="f-input" type="text" placeholder="Ex: React, JavaScript, Frontend">
+    </div>
+    <div class="field hidden" id="options-field">
       <div class="field-label">Choix de réponse <span style="color:var(--accent)">*</span></div>
       <div id="options-list"></div>
       <div class="skill-row" style="margin-top:8px">
@@ -403,7 +407,28 @@ let currentStep = 1;
 const skills = @json($offre->competences_requises ? explode(', ', $offre->competences_requises) : []);
 @php
     $questionsArray = [];
-    if ($offre->questions_json) {
+    // Load questions from database if questionnaire exists
+    if ($questionnaire && $questions) {
+        foreach ($questions as $question) {
+            $options = [];
+            if ($question->type_question === 'QCM') {
+                foreach ($question->options as $option) {
+                    $options[] = [
+                        'text' => $option->contenu_option,
+                        'isCorrect' => $option->est_bonne_reponse
+                    ];
+                }
+            }
+            $questionsArray[] = [
+                'q' => $question->enonce_question,
+                't' => $question->type_question === 'QCM' ? 'qcm' : 'text',
+                'points' => $question->points_question,
+                'options' => $options,
+                'keywords' => $question->mots_cles
+            ];
+        }
+    } elseif ($offre->questions_json) {
+        // Fallback to old JSON format for backward compatibility
         $questionsArray = json_decode($offre->questions_json, true);
         if (!is_array($questionsArray)) {
             $questionsArray = [];
@@ -427,6 +452,25 @@ renderEtapes();
 refreshApercu();
 
 function goTo(n) {
+  // Validate required fields before moving to step 4
+  if (n === 4) {
+    const titre = document.getElementById('f-titre').value.trim();
+    const loc = document.getElementById('f-loc').value.trim();
+    
+    if (!titre) {
+      alert('Veuillez remplir le titre du poste.');
+      goTo(1);
+      document.getElementById('f-titre').focus();
+      return;
+    }
+    if (!loc) {
+      alert('Veuillez remplir la localisation.');
+      goTo(1);
+      document.getElementById('f-loc').focus();
+      return;
+    }
+  }
+  
   document.querySelectorAll('[id^="s"]').forEach(el => el.classList.add('hidden'));
   const el = document.getElementById('s' + n);
   if (el) { el.classList.remove('hidden'); }
@@ -455,10 +499,13 @@ function removeSkill(i) { skills.splice(i, 1); renderSkills(); }
 function toggleOptionsField() {
   const type = document.getElementById('m-type').value;
   const optionsField = document.getElementById('options-field');
+  const keywordsField = document.getElementById('keywords-field');
   if (type === 'text') {
     optionsField.classList.add('hidden');
+    keywordsField.classList.remove('hidden');
   } else {
     optionsField.classList.remove('hidden');
+    keywordsField.classList.add('hidden');
   }
 }
 
@@ -466,6 +513,7 @@ function openModal() {
   document.getElementById('m-question').value = '';
   document.getElementById('m-type').value = 'text';
   document.getElementById('m-points').value = '10';
+  document.getElementById('m-keywords').value = '';
   currentOptions.length = 0;
   renderOptions();
   toggleOptionsField();
@@ -485,7 +533,7 @@ function addOption() {
   const inp = document.getElementById('option-inp');
   const val = inp.value.trim();
   if (!val) return;
-  currentOptions.push(val);
+  currentOptions.push({ text: val, isCorrect: false });
   renderOptions();
   inp.value = '';
 }
@@ -493,8 +541,19 @@ function addOption() {
 function renderOptions() {
   const list = document.getElementById('options-list');
   list.innerHTML = currentOptions.map((opt, i) =>
-    `<div class="tag" style="margin-bottom:4px">${opt} <span class="tag-rm" onclick="removeOption(${i})">×</span></div>`
+    `<div class="tag" style="margin-bottom:4px;display:flex;align-items:center;gap:8px">
+      <input type="radio" name="correct-option" onchange="setCorrectOption(${i})" ${opt.isCorrect ? 'checked' : ''}>
+      <span>${opt.text}</span>
+      <span class="tag-rm" onclick="removeOption(${i})">×</span>
+    </div>`
   ).join('');
+}
+
+function setCorrectOption(index) {
+  currentOptions.forEach((opt, i) => {
+    opt.isCorrect = (i === index);
+  });
+  renderOptions();
 }
 
 function removeOption(i) {
@@ -506,6 +565,7 @@ function addQuestion() {
   const q = document.getElementById('m-question').value.trim();
   const t = document.getElementById('m-type').value;
   const points = parseInt(document.getElementById('m-points').value) || 10;
+  const keywords = document.getElementById('m-keywords').value.trim();
   if (!q) return;
   
   if (t !== 'text' && currentOptions.length === 0) {
@@ -513,7 +573,15 @@ function addQuestion() {
     return;
   }
   
-  questions.push({ q, t, points, options: t !== 'text' ? [...currentOptions] : [] });
+  if (t === 'qcm') {
+    const hasCorrect = currentOptions.some(opt => opt.isCorrect);
+    if (!hasCorrect) {
+      alert('Veuillez sélectionner la bonne réponse pour le QCM.');
+      return;
+    }
+  }
+  
+  questions.push({ q, t, points, options: t !== 'text' ? [...currentOptions] : [], keywords: t === 'text' ? keywords : '' });
   renderQuestions();
   refreshApercu();
   closeModal();
@@ -543,9 +611,17 @@ function editQ(i) {
   document.getElementById('m-question').value = item.q;
   document.getElementById('m-type').value = item.t;
   document.getElementById('m-points').value = item.points;
+  document.getElementById('m-keywords').value = item.keywords || '';
   currentOptions.length = 0;
   if (item.options) {
-    item.options.forEach(opt => currentOptions.push(opt));
+    item.options.forEach(opt => {
+      // Handle both old format (string) and new format (object with text and isCorrect)
+      if (typeof opt === 'string') {
+        currentOptions.push({ text: opt, isCorrect: false });
+      } else {
+        currentOptions.push(opt);
+      }
+    });
   }
   renderOptions();
   toggleOptionsField();
@@ -582,9 +658,28 @@ function refreshApercu() {
 
 // ---- SUBMIT ----
 function prepareSubmit() {
+  // Set hidden field values
   document.getElementById('competences-input').value = skills.join(', ');
   document.getElementById('questions-input').value = JSON.stringify(questions);
   document.getElementById('etapes-input').value = JSON.stringify(etapes);
+  
+  // Validate required fields before submission
+  const titre = document.getElementById('f-titre').value.trim();
+  const loc = document.getElementById('f-loc').value.trim();
+  
+  if (!titre) {
+    alert('Veuillez remplir le titre du poste.');
+    goTo(1);
+    document.getElementById('f-titre').focus();
+    return false;
+  }
+  if (!loc) {
+    alert('Veuillez remplir la localisation.');
+    goTo(1);
+    document.getElementById('f-loc').focus();
+    return false;
+  }
+  
   return true;
 }
 </script>
